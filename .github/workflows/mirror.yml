@@ -2,9 +2,10 @@
 # manifest.json) is published to its own read-only repository <owner>/<id>, created on the first
 # merge. All the logic lives in scripts/mirror.sh. Nobody commits to a mirror.
 #
-# - on a pull request: dry run, prints what merging would create, push or tag (no secret needed);
+# - on a pull request or any branch other than main: dry run, prints what merging would create, push or tag (no secret needed);
 # - on main: does it for real;
-# - daily: reconciles any drift (a diverged mirror is overwritten and the run fails, so it is noticed).
+# - daily: reconciles any drift. A diverged mirror is never overwritten by itself: the run fails so
+#   it is noticed; rerun the workflow manually with "force" to reset it.
 # Needs a secret MIRROR_TOKEN able to create repositories and write Contents and Administration
 # (rulesets) on them.
 name: mirror
@@ -15,6 +16,11 @@ on:
   schedule:
     - cron: "17 5 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Overwrite a mirror that diverged from the source"
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -30,9 +36,10 @@ jobs:
           persist-credentials: false  # otherwise GITHUB_TOKEN's extraheader overrides MIRROR_TOKEN
       - name: Publish plugin mirrors
         env:
-          MIRROR_TOKEN: ${{ github.event_name == 'pull_request' && '' || secrets.MIRROR_TOKEN }}
+          MIRROR_TOKEN: ${{ github.ref != 'refs/heads/main' && '' || secrets.MIRROR_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           MIRROR_OWNER: ${{ github.repository_owner }}
           SOURCE_REPO: ${{ github.repository }}
-          DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '' }}
+          DRY_RUN: ${{ github.ref != 'refs/heads/main' && '1' || '' }}
+          FORCE: ${{ inputs.force && '1' || '' }}
         run: scripts/mirror.sh
