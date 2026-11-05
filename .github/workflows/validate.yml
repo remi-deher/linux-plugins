@@ -1,5 +1,8 @@
 name: validate
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:   # dispatched by the version workflow: its bot commit triggers nothing by itself
 permissions:
   contents: read
 jobs:
@@ -7,5 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: scripts/validate-all.sh
-      - run: shellcheck scripts/*.sh linux/*/*/bin/* 2>/dev/null || true
+        with:
+          fetch-depth: 0
+      - name: Plugins and generated index
+        env:
+          BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: scripts/validate-all.sh
+      - name: shellcheck
+        run: shellcheck scripts/*.sh linux/*/*/bin/*

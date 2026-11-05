@@ -2,16 +2,20 @@
 
 Personal collection of shell plugins for Linux desktops, sorted by environment.
 
-| Environment | Plugin | What it does | Status |
-| --- | --- | --- | --- |
-| Ryoku | [ryoku-pods](linux/ryoku/ryoku-pods) | AirPods battery, listening modes and settings in the bar | works with AirPods Pro 3; case battery unconfirmed |
-| Omarchy | – | – | empty for now |
+<!-- plugins:start -->
+| Plugin | Environment | Version | Status | What it does |
+| --- | --- | --- | --- | --- |
+| [ryoku-pods](linux/ryoku/ryoku-pods) | ryoku | 0.2.0 | experimental | AirPods in the Ryoku bar: per-pod and case battery, listening mode, adaptive noise level, conversation awareness, one-bud ANC and ear detection. |
+<!-- plugins:end -->
+
+Omarchy: nothing yet. The table above is generated from the manifests (`scripts/gen-index.sh`).
 
 ## Layout
 
 ```text
 linux/<environment>/<plugin>/   one self-contained plugin per folder
-scripts/                        new-plugin.sh, validate-all.sh, bump-versions.sh, mirror.sh
+scripts/                        new-plugin.sh, validate-all.sh, gen-index.sh, bump-versions.sh, mirror.sh
+plugins.json                    generated index of the plugins
 CREDITS.md                      upstream authors and licences
 ```
 
@@ -33,14 +37,21 @@ folder (`github.com/<owner>/<plugin>`), so `ryoku plugin add <mirror-url> --bar 
 This repository is the only place anyone works in: `main` takes pull requests only, and the
 mirrors take nothing but CI.
 
-1. `scripts/new-plugin.sh ryoku <id>`, then develop in `linux/ryoku/<id>/`.
+1. `scripts/new-plugin.sh ryoku <id>`, then develop in `linux/ryoku/<id>/`. A new plugin is a
+   `draft`: it is validated but never published.
 2. Open a PR. `validate` checks the plugin, `version` raises its manifest version (label the PR
-   `bump:minor` or `bump:major` for more than a patch), and `mirror` prints what merging would do.
-3. Merge. `mirror` creates `<owner>/<id>` the first time (public, read-only), pushes the plugin
-   there, tags `v<version>` and adds the protection rulesets. Nothing else to configure.
+   `bump:minor` or `bump:major` for more than a patch) and refreshes the index, and `mirror`
+   prints what merging would do.
+3. To publish, set `"status": "experimental"` (or `"stable"`) in the manifest and merge. `mirror`
+   creates `<owner>/<id>` the first time (public, read-only, issues off), pushes the plugin
+   there, tags `v<version>`, sets the topics and adds the protection rulesets.
 
-A plugin's manifest `id` must equal its folder name. Removing a plugin folder never deletes
-its mirror: delete that repository by hand if you want it gone.
+Lifecycle, from the manifest `status`: `draft` (not published) → `experimental` / `stable`
+(mirrored) → `deprecated` (mirrored, flagged in the description) → `archived` (mirror archived).
+A plugin folder is never deleted: archive it, or for a rename add `"replaces": "<old-id>"` to the
+new manifest and the old mirror is archived with a pointer to the new one. Mirrors are never
+deleted by CI. A mirror that diverged from the source is not overwritten; rerun the `mirror`
+workflow manually with `force`.
 
 ## Working here
 
