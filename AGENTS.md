@@ -7,3 +7,5 @@
 - Register a plugin in `mirrors.json` only when its single-plugin repo exists.
 - Do not publish (`ryoku plugin share`, pushes, repo creation) unless the owner asks.
 - Commit messages in French or English, no co-author trailers.
+- Versioning is automatic: on each PR, `version.yml` raises the manifest version of every plugin folder the PR changes (patch by default; label the PR `bump:minor` or `bump:major` for more). Do not edit `version` by hand unless you want a higher one. `mirror.yml` then tags `v<version>` on the plugin's mirror.
+- `main` accepts pull requests only, and mirror repositories are read-only: never push to either directly.
