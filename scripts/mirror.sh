@@ -32,6 +32,17 @@ fi
 # Mutations go through this, so a dry run only reads.
 mutate() { if [ -n "$dry" ]; then echo "[dry-run] $*"; else "$@" >/dev/null; fi; }
 
+# Administration calls (create, description, rulesets) need a token with Administration write.
+# When one fails the code is still synchronised; the run is marked failed so it gets fixed.
+admin_failed=0
+admin() {
+  if ! "$@"; then
+    echo "::error::$* failed: MIRROR_TOKEN probably lacks Administration (repository) write permission"
+    admin_failed=1
+    return 1
+  fi
+}
+
 repo_exists() {
   local out
   if out=$(gh api "repos/$1" --jq .full_name 2>&1); then return 0; fi
@@ -48,7 +59,7 @@ create_repo() { # <id> <description>
 
 ensure_rulesets() { # <repo>
   local existing f name
-  existing=$(gh api "repos/$1/rulesets" --jq '.[].name' 2>/dev/null || true)
+  existing=$(gh api "repos/$1/rulesets" --jq '.[].name')
   for f in scripts/mirror-rulesets/*.json; do
     name=$(jq -r .name "$f")
     if grep -qxF "$name" <<<"$existing"; then continue; fi
@@ -74,12 +85,9 @@ for manifest in linux/*/*/manifest.json; do
   desc=${desc:0:340}
   split=$(git subtree split --prefix="$path")
 
-  if repo_exists "$repo"; then
-    current=$(gh api "repos/$repo" --jq '.description // ""')
-    [ "$current" = "$desc" ] || mutate gh api -X PATCH "repos/$repo" -f description="$desc"
-  else
+  if ! repo_exists "$repo"; then
     echo "$repo does not exist: creating it"
-    create_repo "$id" "$desc"
+    if ! admin create_repo "$id" "$desc"; then status=1; continue; fi
     if [ -n "$dry" ]; then
       echo "[dry-run] would push $path ($split) to $repo and tag v$(git show "$split:manifest.json" | jq -r .version)"
       continue
@@ -110,6 +118,10 @@ for manifest in linux/*/*/manifest.json; do
     echo "::warning::$repo: $tag already points to another commit; bump the version in $path/manifest.json to publish a new tag"
   fi
 
-  ensure_rulesets "$repo"
+  # Administration steps come last, so a token without that permission still syncs the code.
+  current=$(gh api "repos/$repo" --jq '.description // ""' 2>/dev/null || true)
+  [ "$current" = "$desc" ] || admin mutate gh api -X PATCH "repos/$repo" -f description="$desc" || true
+  admin ensure_rulesets "$repo" || true
 done
+[ "$admin_failed" = 0 ] || status=1
 exit $status
