@@ -2,15 +2,14 @@
 # source, so the version is raised inside the PR: for every plugin folder the PR changes, the
 # manifest version is set to (base version + patch|minor|major). Patch by default; add the label
 # bump:minor or bump:major for more. The generated index (README table, plugins.json) is refreshed
-# in the same commit. A push by GITHUB_TOKEN triggers nothing, so validate and the mirror dry run
-# are dispatched explicitly on the new head: their checks then show on the PR's latest commit.
+# in the same commit. It is pushed with MIRROR_TOKEN (not GITHUB_TOKEN), so validate and the mirror
+# dry run run normally on the new head, without any approval step. Only same-repo PRs get here.
 name: version
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 permissions:
   contents: write
-  actions: write
 concurrency:
   group: version-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -22,12 +21,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.MIRROR_TOKEN }}
           fetch-depth: 0
       - name: Bump changed plugins
         env:
           BASE_REF: ${{ github.base_ref }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          GH_TOKEN: ${{ github.token }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           set -euo pipefail
@@ -41,5 +40,3 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "version: incrément automatique ($level)"
           git push origin "HEAD:refs/heads/$HEAD_REF"
-          gh workflow run validate.yml --ref "$HEAD_REF"
-          gh workflow run mirror.yml --ref "$HEAD_REF"

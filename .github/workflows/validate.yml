@@ -2,7 +2,6 @@ name: validate
 on:
   push:
   pull_request:
-  workflow_dispatch:   # dispatched by the version workflow: its bot commit triggers nothing by itself
 permissions:
   contents: read
 jobs:
