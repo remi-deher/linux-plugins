@@ -13,18 +13,22 @@
 #
 # Per published plugin, in order:
 #   1. create the mirror repository if it does not exist (public, named after the folder);
-#   2. keep description, homepage and "no issues" in step with the manifest;
-#   3. refuse to move a tag (a tag that points elsewhere means the version was not raised);
-#   4. push the plugin subtree to main (a diverged mirror is NOT overwritten, unless FORCE=1);
-#   5. tag v<manifest version>;
-#   6. make sure the read-only rulesets (scripts/mirror-rulesets/*.json) and topics exist;
-#   7. archive the mirror when the status is "archived", and retire the replaced one.
+#   2. refuse to move a tag (a tag that points elsewhere means the version was not raised);
+#   3. push the plugin subtree to main (a diverged mirror is NOT overwritten, unless FORCE=1);
+#   4. tag v<manifest version>;
+#   5. then the administration steps: description, homepage and "no issues", the read-only
+#      rulesets (scripts/mirror-rulesets/*.json), topics, archiving, retiring a replaced mirror.
+# The code is pushed and tagged before any administration step. If the token lacks the
+# Administration permission those steps are refused: the run fails with a clear message, but the
+# mirror's code is already in step. (Creating the repository and unarchiving it must come first:
+# without them nothing can be pushed.)
 #
 # Env: MIRROR_TOKEN (needs repo creation, Contents and Administration write), MIRROR_OWNER,
 #      SOURCE_REPO (default <owner>/linux-plugins), DRY_RUN=1 (read-only: prints what it would
 #      do), FORCE=1 (overwrite a mirror that diverged from the source).
 set -euo pipefail
 
+rc=0
 owner=${MIRROR_OWNER:?MIRROR_OWNER is required}
 source_repo=${SOURCE_REPO:-$owner/linux-plugins}
 dry=${DRY_RUN:-}
@@ -43,6 +47,14 @@ fi
 
 # Mutations go through this, so a dry run only reads.
 mutate() { if [ -n "$dry" ]; then echo "[dry-run] $*"; else "$@" >/dev/null; fi; }
+
+# An administration step: a refusal fails the run (rc=1) but never stops the synchronisation.
+admin() {
+  if ! mutate "$@"; then
+    echo "::error::refused: $*. MIRROR_TOKEN probably lacks the Administration (repository) write permission."
+    rc=1
+  fi
+}
 
 repo_exists() {
   local out
@@ -65,7 +77,7 @@ ensure_rulesets() { # <repo>
     name=$(jq -r .name "$f")
     if grep -qxF "$name" <<<"$existing"; then continue; fi
     echo "$1: adding ruleset \"$name\""
-    mutate gh api -X POST "repos/$1/rulesets" --input "$f"
+    admin gh api -X POST "repos/$1/rulesets" --input "$f"
   done
 }
 
@@ -75,7 +87,7 @@ ensure_topics() { # <repo> <environment>
   have=$(gh api "repos/$1/topics" --jq '.names | sort | join(",")' 2>/dev/null || true)
   [ "$have" = "$want" ] && return 0
   echo "$1: topics -> $want"
-  mutate gh api -X PUT "repos/$1/topics" -f 'names[]=linux-plugin' -f "names[]=$2"
+  admin gh api -X PUT "repos/$1/topics" -f 'names[]=linux-plugin' -f "names[]=$2"
 }
 
 # The mirror of a renamed plugin is archived and points to its successor.
@@ -84,11 +96,10 @@ retire_replaced() { # <old-id> <new-id>
   repo_exists "$old" || return 0
   [ "$(gh api "repos/$old" --jq .archived)" = "true" ] && return 0
   echo "$old: replaced by $2, archiving it"
-  mutate gh api -X PATCH "repos/$old" -f description="Renamed to $2: https://github.com/$owner/$2" \
+  admin gh api -X PATCH "repos/$old" -f description="Renamed to $2: https://github.com/$owner/$2" \
     -f homepage="https://github.com/$owner/$2" -F archived=true
 }
 
-rc=0
 for manifest in linux/*/*/manifest.json; do
   [ -e "$manifest" ] || continue
   path=$(dirname "$manifest")
@@ -129,15 +140,23 @@ for manifest in linux/*/*/manifest.json; do
     if [ "$(jq -r '.[0]' <<<"$info")" = "true" ]; then
       if [ "$plugin_status" = archived ]; then echo "$repo is archived, nothing to do"; continue; fi
       echo "$repo: status is $plugin_status, unarchiving"
-      mutate gh api -X PATCH "repos/$repo" -F archived=false
+      if ! mutate gh api -X PATCH "repos/$repo" -F archived=false; then
+        echo "::error::$repo: cannot unarchive it, so nothing can be pushed. MIRROR_TOKEN probably lacks the Administration (repository) write permission."
+        rc=1; continue
+      fi
     fi
+    needs_sync=""
     if [ "$(jq -r '.[1]' <<<"$info")" != "$desc" ] || [ "$(jq -r '.[2]' <<<"$info")" != "$home" ] \
        || [ "$(jq -r '.[3]' <<<"$info")" != "false" ]; then
-      mutate gh api -X PATCH "repos/$repo" -f description="$desc" -f homepage="$home" -F has_issues=false
+      needs_sync=1
     fi
   else
     echo "$repo does not exist: creating it"
-    create_repo "$id" "$desc" "$home"
+    needs_sync=""
+    if ! create_repo "$id" "$desc" "$home"; then
+      echo "::error::$repo: cannot create it. MIRROR_TOKEN probably lacks permission to create repositories (or Administration write)."
+      rc=1; continue
+    fi
     if [ -n "$dry" ]; then
       echo "[dry-run] would push $path ($split) to $repo and tag $tag"
       continue
@@ -174,6 +193,10 @@ for manifest in linux/*/*/manifest.json; do
     echo "$repo: tagged $tag"
   fi
 
+  # Administration steps, after the code is in place.
+  if [ -n "$needs_sync" ]; then
+    admin gh api -X PATCH "repos/$repo" -f description="$desc" -f homepage="$home" -F has_issues=false
+  fi
   ensure_rulesets "$repo"
   ensure_topics "$repo" "$env_name"
 
@@ -182,7 +205,7 @@ for manifest in linux/*/*/manifest.json; do
 
   if [ "$plugin_status" = archived ]; then
     echo "$repo: archiving"
-    mutate gh api -X PATCH "repos/$repo" -F archived=true
+    admin gh api -X PATCH "repos/$repo" -F archived=true
   fi
 done
 exit $rc
