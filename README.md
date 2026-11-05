@@ -5,7 +5,7 @@ Personal collection of shell plugins for Linux desktops, sorted by environment.
 <!-- plugins:start -->
 | Plugin | Environment | Version | Status | What it does |
 | --- | --- | --- | --- | --- |
-| [ryoku-pods](linux/ryoku/ryoku-pods) | ryoku | 0.2.3 | experimental | AirPods in the Ryoku bar: per-pod and case battery, listening mode, adaptive noise level, conversation awareness, one-bud ANC and ear detection. |
+| [ryoku-pods](linux/ryoku/ryoku-pods) | ryoku | 0.2.4 | experimental | AirPods in the Ryoku bar: per-pod and case battery, listening mode, adaptive noise level, conversation awareness, one-bud ANC and ear detection. |
 <!-- plugins:end -->
 
 Omarchy: nothing yet. The table above is generated from the manifests (`scripts/gen-index.sh`).
