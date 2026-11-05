@@ -1,0 +1,28 @@
+# Publishes each plugin folder listed in mirrors.json to its own repository, so that
+# `ryoku plugin add <url>` (which needs manifest.json at the repo root) works.
+# Needs a secret MIRROR_TOKEN: a fine-grained token with Contents write on the mirror repos.
+name: mirror
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push each plugin subtree
+        env:
+          MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -n "$MIRROR_TOKEN" ] || { echo "MIRROR_TOKEN not set, skipping"; exit 0; }
+          git config user.name "mirror-bot"; git config user.email "mirror-bot@users.noreply.github.com"
+          jq -r 'to_entries[] | "\(.key) \(.value)"' mirrors.json | while read -r path repo; do
+            git subtree split --prefix="$path" -b "mirror-tmp"
+            git push --force "https://x-access-token:${MIRROR_TOKEN}@github.com/${repo}.git" mirror-tmp:main
+            git branch -D mirror-tmp
+          done
