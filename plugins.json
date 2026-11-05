@@ -3,7 +3,7 @@
     "id": "ryoku-pods",
     "name": "AirPods",
     "environment": "ryoku",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "status": "experimental",
     "description": "AirPods in the Ryoku bar: per-pod and case battery, listening mode, adaptive noise level, conversation awareness, one-bud ANC and ear detection.",
     "path": "linux/ryoku/ryoku-pods",
