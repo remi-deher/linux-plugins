@@ -8,6 +8,7 @@ for m in "$root"/linux/*/*/manifest.json; do
   d=$(dirname "$m")
   rel=${d#"$root"/}
   python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$m" || { echo "FAIL $rel: invalid manifest.json"; fail=1; continue; }
+  [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id",""))' "$m")" = "$(basename "$d")" ] || { echo "FAIL $rel: manifest id differs from the folder name (the mirror is named after the folder)"; fail=1; }
   for f in README.md LICENSE; do [ -f "$d/$f" ] || { echo "FAIL $rel: missing $f"; fail=1; }; done
   if [ "$(basename "$(dirname "$d")")" = ryoku ] && command -v ryoku >/dev/null 2>&1; then
     ryoku plugin validate "$d" >/dev/null || { echo "FAIL $rel: ryoku plugin validate"; fail=1; }

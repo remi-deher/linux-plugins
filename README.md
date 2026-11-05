@@ -11,8 +11,7 @@ Personal collection of shell plugins for Linux desktops, sorted by environment.
 
 ```text
 linux/<environment>/<plugin>/   one self-contained plugin per folder
-mirrors.json                    plugin folder -> single-plugin repo it is published to
-scripts/                        new-plugin.sh, validate-all.sh
+scripts/                        new-plugin.sh, validate-all.sh, bump-versions.sh, mirror.sh
 CREDITS.md                      upstream authors and licences
 ```
 
@@ -26,8 +25,22 @@ git clone https://github.com/remi-deher/linux-plugins
 ryoku plugin add linux-plugins/linux/ryoku/ryoku-pods --bar --yes
 ```
 
-Plugins listed in [`mirrors.json`](mirrors.json) are also published to their own
-repository by CI, so `ryoku plugin add <mirror-url> --bar --yes` works too.
+Every plugin is also published by CI to its own read-only repository, named after its
+folder (`github.com/<owner>/<plugin>`), so `ryoku plugin add <mirror-url> --bar --yes` works too.
+
+## Publication flow
+
+This repository is the only place anyone works in: `main` takes pull requests only, and the
+mirrors take nothing but CI.
+
+1. `scripts/new-plugin.sh ryoku <id>`, then develop in `linux/ryoku/<id>/`.
+2. Open a PR. `validate` checks the plugin, `version` raises its manifest version (label the PR
+   `bump:minor` or `bump:major` for more than a patch), and `mirror` prints what merging would do.
+3. Merge. `mirror` creates `<owner>/<id>` the first time (public, read-only), pushes the plugin
+   there, tags `v<version>` and adds the protection rulesets. Nothing else to configure.
+
+A plugin's manifest `id` must equal its folder name. Removing a plugin folder never deletes
+its mirror: delete that repository by hand if you want it gone.
 
 ## Working here
 
