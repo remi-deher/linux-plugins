@@ -1,0 +1,38 @@
+# Auto-versioning. main only takes pull requests, and the mirrors must stay identical to the
+# source, so the version is raised inside the PR: for every plugin folder the PR changes, the
+# manifest version is set to (base version + patch|minor|major). Patch by default; add the label
+# bump:minor or bump:major for more. Pushed by GITHUB_TOKEN, so it does not retrigger workflows.
+name: version
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+permissions:
+  contents: write
+concurrency:
+  group: version-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  bump:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Bump changed plugins
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+          level=patch
+          case ",$LABELS," in *",bump:minor,"*) level=minor ;; esac
+          case ",$LABELS," in *",bump:major,"*) level=major ;; esac
+          scripts/bump-versions.sh "origin/$BASE_REF" "$level"
+          if git diff --quiet; then echo "nothing to commit"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "version: incrément automatique ($level)"
+          git push origin "HEAD:refs/heads/$HEAD_REF"
