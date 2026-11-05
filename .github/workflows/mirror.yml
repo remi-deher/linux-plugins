@@ -1,13 +1,25 @@
-# Publishes each plugin folder listed in mirrors.json to its own repository, so that
-# `ryoku plugin add <url>` (which needs manifest.json at the repo root) works.
+# linux-plugins is the single source of truth. Each plugin folder listed in mirrors.json is
+# published to its own read-only repository, so that `ryoku plugin add <url>` (which needs
+# manifest.json at the repo root) works. Nobody commits to a mirror: it is rewritten from here.
+#
+# - Skips a mirror that is already identical (the subtree split is deterministic).
+# - If a mirror holds history that is not an ancestor of the source, it is overwritten and the
+#   run FAILS, so the drift is noticed and never left in place.
+# - Tags v<manifest version> when that version has no tag yet.
+# - A daily run reconciles any drift even without a push to main.
 # Needs a secret MIRROR_TOKEN: a fine-grained token with Contents write on the mirror repos.
 name: mirror
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "17 5 * * *"
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: mirror
+  cancel-in-progress: false
 jobs:
   mirror:
     runs-on: ubuntu-latest
@@ -21,10 +33,36 @@ jobs:
           MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
         run: |
           set -euo pipefail
-          [ -n "$MIRROR_TOKEN" ] || { echo "MIRROR_TOKEN not set, skipping"; exit 0; }
+          [ -n "$MIRROR_TOKEN" ] || { echo "::error::MIRROR_TOKEN is not set, mirrors cannot be updated"; exit 1; }
           git config user.name "mirror-bot"; git config user.email "mirror-bot@users.noreply.github.com"
-          jq -r 'to_entries[] | "\(.key) \(.value)"' mirrors.json | while read -r path repo; do
-            git subtree split --prefix="$path" -b "mirror-tmp"
-            git push --force "https://x-access-token:${MIRROR_TOKEN}@github.com/${repo}.git" mirror-tmp:main
-            git branch -D mirror-tmp
-          done
+          status=0
+          while read -r path repo; do
+            url="https://x-access-token:${MIRROR_TOKEN}@github.com/${repo}.git"
+            split=$(git subtree split --prefix="$path")
+            remote=$(git ls-remote "$url" refs/heads/main | cut -f1)
+
+            if [ "$remote" = "$split" ]; then
+              echo "$repo is up to date"
+            else
+              if [ -n "$remote" ]; then
+                git fetch --quiet --no-tags "$url" main
+                if ! git merge-base --is-ancestor "$remote" "$split"; then
+                  echo "::error::$repo diverged from linux-plugins (commit $remote is not in the source history); overwriting it"
+                  status=1
+                fi
+              fi
+              git push --force "$url" "$split:refs/heads/main"
+            fi
+
+            version=$(git show "$split:manifest.json" | jq -r '.version')
+            tag="v$version"
+            tag_sha=$(git ls-remote "$url" "refs/tags/$tag" | cut -f1)
+            if [ -z "$tag_sha" ]; then
+              git tag "$tag" "$split"
+              git push "$url" "refs/tags/$tag"
+              echo "$repo: tagged $tag"
+            elif [ "$tag_sha" != "$split" ]; then
+              echo "::warning::$repo: $tag already points to another commit; bump the version in $path/manifest.json to publish a new tag"
+            fi
+          done < <(jq -r 'to_entries[] | "\(.key) \(.value)"' mirrors.json)
+          exit $status
