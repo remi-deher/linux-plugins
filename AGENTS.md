@@ -6,7 +6,12 @@ read-only repository (the mirror). See the README for the full path from idea to
 ## Layout and content
 - One plugin per folder: `linux/<environment>/<id>/`, with `manifest.json` at that folder's root, plus `README.md` and `LICENSE`. The manifest `id` must equal the folder name (the mirror is named after the folder).
 - Ryoku plugins follow Ryoku's rules R1-R11 (`ryoku plugin validate <dir>` must report 0 blocking). Read the plugin's own `AGENTS.md` if it has one (`ryoku plugin new` generates it).
-- Never ship compiled binaries or third-party daemons. Reference upstream in the plugin README and in `CREDITS.md` instead.
+- A plugin may ship a third-party daemon or helper **as source**, in a subfolder of the plugin (for example `daemon/`), so that it can be built and distributed from this repository alone. Conditions:
+  - the licence is compatible (a copyleft licence such as GPLv3 stays on those files; the rest of the plugin keeps its own) and its `LICENSE` file is kept in that subfolder;
+  - the original authors are credited: an `UPSTREAM.md` next to the code (origin, fork point, what was modified, by whom), a row in `CREDITS.md`, and the plugin README;
+  - anything not redistributable is left out (for example Apple fonts or other proprietary assets), even if upstream bundles it;
+  - it is built by a script run by the user, outside the installed plugin (build in `$XDG_CACHE_HOME/ryoku/plugins/<id>`), never downloaded or compiled behind their back.
+- Never commit compiled binaries (ELF, Mach-O, `.so`): Ryoku's validator blocks them (R10) and CI runs it without `--allow`. Ship the source and a build script instead.
 - A plugin that derives from other work keeps that author's copyright in its `LICENSE` and has a row in `CREDITS.md`.
 - Create plugins with `scripts/new-plugin.sh ryoku <id>`; check them with `scripts/validate-all.sh`.
 
