@@ -22,7 +22,7 @@
     "bin/ryopods-setup",
     "bin/ryopods-remove",
     "bin/ryopods-connect",
-    "patches/0001-conversation-awareness-volume.patch",
+    "daemon/CMakeLists.txt",
     "content/AirPodsIcon.qml",
     "content/Segmented.qml",
     "service/Model.js",
