@@ -21,6 +21,7 @@
   "files": [
     "bin/ryopods-setup",
     "bin/ryopods-remove",
+    "bin/ryopods-connect",
     "content/AirPodsIcon.qml",
     "content/Segmented.qml",
     "service/Model.js",
@@ -42,6 +43,7 @@
   "dependencies": {
     "commands": [
       "librepods-ctl",
+      "bluetoothctl",
       "notify-send"
     ],
     "packages": [

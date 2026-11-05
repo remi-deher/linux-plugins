@@ -46,6 +46,8 @@ Item {
   readonly property int connectHoldMs: 12000
 
   readonly property string ctlPath: "librepods-ctl"
+  // The daemon forgets the address when the pods drop, so connect goes through bluetoothctl.
+  readonly property string connectScript: Qt.resolvedUrl("../bin/ryopods-connect").toString().replace(/^file:\/\//, "")
   readonly property bool busy: commandProcess.running
   // The daemon publishes here on change, so there is nothing to poll.
   readonly property string statePath: (Quickshell.env("XDG_STATE_HOME")
@@ -227,7 +229,8 @@ Item {
       _queued = { verb: verb, field: field, optimistic: optimistic }
       return
     }
-    commandProcess.command = [ctlPath, verb]
+    commandProcess.command = (verb === "connect" || verb === "disconnect")
+      ? [connectScript, verb] : [ctlPath, verb]
     commandProcess.running = true
   }
 
