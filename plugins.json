@@ -1,5 +1,15 @@
 [
   {
+    "id": "proton-vpn",
+    "name": "Proton VPN",
+    "environment": "ryoku",
+    "version": "0.1.0",
+    "status": "experimental",
+    "description": "Proton VPN in the Ryoku bar: world map of cities, one-click connect, quick connect (Fastest, Random, P2P, Secure Core, Tor), Kill Switch, NetShield, port forwarding and live traffic. Port of OmaProton VPN.",
+    "path": "linux/ryoku/proton-vpn",
+    "mirror": "https://github.com/remi-deher/proton-vpn"
+  },
+  {
     "id": "ryoku-pods",
     "name": "AirPods",
     "environment": "ryoku",
