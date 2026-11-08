@@ -5,6 +5,7 @@ Personal collection of shell plugins for Linux desktops, sorted by environment.
 <!-- plugins:start -->
 | Plugin | Environment | Version | Status | What it does |
 | --- | --- | --- | --- | --- |
+| [proton-vpn](linux/ryoku/proton-vpn) | ryoku | 0.1.0 | experimental | Proton VPN in the Ryoku bar: world map of cities, one-click connect, quick connect (Fastest, Random, P2P, Secure Core, Tor), Kill Switch, NetShield, port forwarding and live traffic. Port of OmaProton VPN. |
 | [ryoku-pods](linux/ryoku/ryoku-pods) | ryoku | 0.2.4 | experimental | AirPods in the Ryoku bar: per-pod and case battery, listening mode, adaptive noise level, conversation awareness, one-bud ANC and ear detection. |
 <!-- plugins:end -->
 
